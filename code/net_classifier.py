@@ -1,3 +1,4 @@
+from turtle import shape
 import numpy as np
 
 def one_in_k_encoding(vec, k):
@@ -74,10 +75,16 @@ def get_init_params(input_dim, hidden_size, output_size):
     Returns:
        dict of randomly initialized parameter matrices.
     """
+    print('Initialize params')
     W1 = np.random.normal(0, np.sqrt(2./(input_dim+hidden_size)), size=(input_dim, hidden_size))
-    b1 = np.zeros((1, hidden_size))
+    b1 = np.ones((1, hidden_size))
     W2 = np.random.normal(0, np.sqrt(4./(hidden_size+output_size)), size=(hidden_size, output_size))
-    b2 = np.zeros((1, output_size))
+    b2 = np.ones((1, output_size))
+    #print('W1', W1)
+    #print('b1', b1)
+    #print('W2', W2)
+    #print('b2', b2)
+    #return make_dict(W1, b1, W2, b2)
     return {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
 
   
@@ -161,10 +168,11 @@ class NetClassifier():
         labels = one_in_k_encoding(y, W2.shape[1]) # shape n x k
                         
         ### YOUR CODE HERE - FORWARD PASS - compute cost with weight decay and store relevant values for backprop
-        X = np.hstack((X, np.ones((X.shape[0], 1))))  # add bias
+        #X = np.hstack((X, np.ones((X.shape[0], 1))))  # add bias
+        #print(shape(X), shape(W1), shape(b1))
         z1 = np.dot(X, W1) + b1  # compute the dot
         a1 = relu(z1)  # use activation function
-        a1 = np.hstack((a1, np.ones((a1.shape[0], 1))))  # add bias
+        #a1 = np.hstack((a1, np.ones((a1.shape[0], 1))))  # add bias
         z2 = np.dot(a1, W2) + b2  # compute the dot
         a2 = softmax(z2)  # predict the probabilities
         ### END CODE
@@ -176,9 +184,11 @@ class NetClassifier():
         d_z1 = d_a1 * (z1 > 0)
         d_w1 = np.dot(X.T, d_z1) + c * W1
         d_b1 = np.sum(d_z1, axis=0)
+        # average cross entropy cost
+        cost = -np.mean(np.sum(labels * np.log(a2), axis=1)) + c * (np.sum(W1 * W1) + np.sum(W2 * W2))
         ### END CODE
         # the return signature
-        return None, {'d_w1': None, 'd_w2': None, 'd_b1': None, 'd_b2': None}
+        return cost, {'d_w1':d_w1, 'd_w2':d_w2, 'd_b1': d_b1, 'd_b2':d_b2 }
         
     def fit(self, X_train, y_train, X_val, y_val, init_params, batch_size=32, lr=0.1, c=1e-4, epochs=30):
         """ Run Mini-Batch Gradient Descent on data X, Y to minimize the in sample error for Neural Net classification
@@ -215,7 +225,7 @@ class NetClassifier():
 
         
         ### YOUR CODE HERE
-        for e in epochs:
+        for e in range(epochs):
             for i in range(0, X_train.shape[0], batch_size):
                 X_batch = X_train[i:i+batch_size]
                 y_batch = y_train[i:i+batch_size]
@@ -224,15 +234,18 @@ class NetClassifier():
                 b1 -= lr * grads['d_b1']
                 W2 -= lr * grads['d_w2']
                 b2 -= lr * grads['d_b2']
-            hist['train_loss'][e] = cost
-            hist['train_acc'][e] = self.score(X_train, y_train, {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2})
-            hist['val_loss'][e] = self.cost_grad(X_val, y_val, {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}, c)[0]
-            hist['val_acc'][e] = self.score(X_val, y_val, {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2})
+            hist['train_loss'].append(cost)
+            hist['train_acc'].append(self.score(X_train, y_train, {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}))
+            hist['val_loss'].append(self.cost_grad(X_val, y_val, {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}, c)[0])
+            hist['val_acc'].append(self.score(X_val, y_val, {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}))
+            #hist['train_acc'][e] = self.score(X_train, y_train, {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2})
+            #hist['val_loss'][e] = self.cost_grad(X_val, y_val, {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}, c)[0]
+            #hist['val_acc'][e] = self.score(X_val, y_val, {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2})
         ### END CODE
         # hist dict should look like this with something different than none
         #hist = {'train_loss': None, 'train_acc': None, 'val_loss': None, 'val_acc': None}
         ## self.params should look like this with something better than none, i.e. the best parameters found.
-        # self.params = {'W1': None, 'b1': None, 'W2': None, 'b2': None}
+        self.params = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
         return hist
         
 
@@ -242,11 +255,16 @@ def numerical_grad_check(f, x, key):
     h = 1e-5
     # d = x.shape[0]
     cost, grad = f(x)
+    print('grad_before key', grad)
     grad = grad[key]
+    print('grad', grad)
+    print('x', x)
     it = np.nditer(x, flags=['multi_index'])
     while not it.finished:    
-        dim = it.multi_index    
-        print(dim)
+        dim = it.multi_index  
+        #print('grad[0,0]', grad[0,0])
+        print('it', it.multi_index)
+        print('dim', dim)  
         tmp = x[dim]
         x[dim] = tmp + h
         cplus, _ = f(x)
