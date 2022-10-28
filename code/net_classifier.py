@@ -76,16 +76,18 @@ def get_init_params(input_dim, hidden_size, output_size):
        dict of randomly initialized parameter matrices.
     """
     print('Initialize params')
-    W1 = np.random.normal(0, np.sqrt(2./(input_dim+hidden_size)), size=(input_dim, hidden_size))
+    print(hidden_size)
+    W1 = np.random.normal(0, 1, size=(input_dim, hidden_size)) # Ændre varians?
     b1 = np.ones((1, hidden_size))
-    W2 = np.random.normal(0, np.sqrt(4./(hidden_size+output_size)), size=(hidden_size, output_size))
+    W2 = np.random.normal(0, 1, size=(hidden_size, output_size))
     b2 = np.ones((1, output_size))
-    #print('W1', W1)
-    #print('b1', b1)
-    #print('W2', W2)
-    #print('b2', b2)
-    #return make_dict(W1, b1, W2, b2)
-    return {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+    print('W1', W1)
+    print('b1', b1)
+    print('W2', W2)
+    print('b2', b2)
+
+    return make_dict(W1, b1, W2, b2)
+
 
   
 class NetClassifier():
@@ -160,12 +162,13 @@ class NetClassifier():
             d_b2: np.array shape b2.shape, entry d_b2[1, j] = \partial cost/ \partial b2[1, j]
             
         """
-        
+
         W1 = params['W1']
         b1 = params['b1']
         W2 = params['W2']
         b2 = params['b2']
-        labels = one_in_k_encoding(y, W2.shape[1]) # shape n x k
+        labels = one_in_k_encoding(y[:, np.newaxis], W2.shape[1]) # shape n x k
+        print(labels.shape)
                         
         ### YOUR CODE HERE - FORWARD PASS - compute cost with weight decay and store relevant values for backprop
         #X = np.hstack((X, np.ones((X.shape[0], 1))))  # add bias
@@ -184,8 +187,17 @@ class NetClassifier():
         d_z1 = d_a1 * (z1 > 0)
         d_w1 = np.dot(X.T, d_z1) + c * W1
         d_b1 = np.sum(d_z1, axis=0)
+        # add fake axis to bs
+        d_b1 = d_b1[:, np.newaxis]
+        d_b2 = d_b2[:, np.newaxis]
         # average cross entropy cost
         cost = -np.mean(np.sum(labels * np.log(a2), axis=1)) + c * (np.sum(W1 * W1) + np.sum(W2 * W2))
+        # print shapes
+        print('d_w1', d_w1.shape)
+        print('d_b1', d_b1.shape)
+        print('d_w2', d_w2.shape)
+        print('d_b2', d_b2.shape)
+
         ### END CODE
         # the return signature
         return cost, {'d_w1':d_w1, 'd_w2':d_w2, 'd_b1': d_b1, 'd_b2':d_b2 }
@@ -255,7 +267,7 @@ def numerical_grad_check(f, x, key):
     h = 1e-5
     # d = x.shape[0]
     cost, grad = f(x)
-    print('grad_before key', grad)
+    #print('grad_before key', grad)
     grad = grad[key]
     print('grad', grad)
     print('x', x)
@@ -281,7 +293,7 @@ def test_grad():
     stars = '*'*5
     print(stars, 'Testing  Cost and Gradient Together')
     input_dim = 7
-    hidden_size = 1
+    hidden_size = 2
     output_size = 3
     nc = NetClassifier()
     params = get_init_params(input_dim, hidden_size, output_size)
